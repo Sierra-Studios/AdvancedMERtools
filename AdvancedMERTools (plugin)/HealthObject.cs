@@ -12,6 +12,7 @@ using System.Linq;
 using UnityEngine;
 using AdvancedMERTools.Events.Arguments;
 using AdvancedMERTools.Events.Handlers;
+using Logger = LabApi.Features.Console.Logger;
 
 namespace AdvancedMERTools;
 
@@ -167,21 +168,25 @@ public class HealthObject : AMERTInteractable, IDestructible
         if (damageHandler != null)
         {
             attacker = Player.Get(damageHandler.Attacker.PlayerId);
+
+            if(attacker == null)
+            {
+                return false;
+            }
+
             FirearmDamageHandler firearm = handler as FirearmDamageHandler;
             ExplosionDamageHandler explosion = handler as ExplosionDamageHandler;
             if (firearm != null)
             {
                 if (Base.whitelistWeapons.Count == 0 || Base.whitelistWeapons.Any(x =>
-                {
-                    if (Item.TryGet(attacker.CurrentItem.Base, out Item item))
                     {
-                        return item.Base.ItemId.SerialNumber == x.CustomItemId;
-                    }
-                    else
-                    {
+                        if (attacker.CurrentItem == null)
+                        {
+                            return false;
+                        }
+
                         return attacker.CurrentItem.Type == x.ItemType;
-                    }
-                }))
+                    }))
                 {
                     FieldInfo info = typeof(FirearmDamageHandler).GetField("_penetration", BindingFlags.NonPublic | BindingFlags.Instance);
                     damage = BodyArmorUtils.ProcessDamage(Base.ArmorEfficient, damage, Mathf.RoundToInt((float)info.GetValue(firearm) * 100f));
@@ -233,83 +238,97 @@ public class HealthObject : AMERTInteractable, IDestructible
 
     public virtual void CheckDead(Player player, float damage)
     {
-        HODTO clone = new()
+        try
         {
-            Health = this.Base.Health,
-            ArmorEfficient = this.Base.ArmorEfficient,
-            DeadType = this.Base.DeadType,
-            ObjectId = this.Base.ObjectId,
-        };
-
-        HealthObjectTakingDamageEventArgs damagingEventArgs = new HealthObjectTakingDamageEventArgs(clone, player);
-        HealthObjectEventHandlers.OnHealthObjectTakingDamage(damagingEventArgs);
-
-        if (!damagingEventArgs.IsAllowed)
-        {
-            return;
-        }
-
-        Health -= damage;
-        Hitmarker.SendHitmarkerDirectly(player.ReferenceHub, damage / 10f);
-        if (Health <= 0)
-        {
-            IsAlive = false;
-            ModuleGeneralArguments args = new()
+            if (player == null) return;
+            if (damage == null)
             {
-                Interpolations = Formatter,
-                InterpolationsList = new object[] { player, transform },
-                Player = player,
-                Schematic = OSchematic,
-                Transform = transform,
-                TargetCalculated = false,
+                Logger.Error("How tf is Damage null???");
+                return;
+            }
+
+            HODTO clone = new()
+            {
+                Health = this.Base.Health,
+                ArmorEfficient = this.Base.ArmorEfficient,
+                DeadType = this.Base.DeadType,
+                ObjectId = this.Base.ObjectId,
             };
-            HealthObjectEventHandlers.OnHealthObjectDied(new HealthObjectDiedEventArgs(clone, player));
 
-            MEC.Timing.CallDelayed(Base.DeadActionDelay, () =>
+            HealthObjectTakingDamageEventArgs damagingEventArgs = new HealthObjectTakingDamageEventArgs(clone, player);
+            HealthObjectEventHandlers.OnHealthObjectTakingDamage(damagingEventArgs);
+
+            if (!damagingEventArgs.IsAllowed)
             {
-                var deadTypeExecutors = new Dictionary<DeadType, Action>
+                return;
+            }
+
+            Health -= damage;
+            player.SendHitMarker(damage / 10f);
+            if (Health <= 0)
+            {
+                IsAlive = false;
+                ModuleGeneralArguments args = new()
                 {
-                    { DeadType.Disappear, () => Destroy(this.gameObject, 0.1f) },
-                    {
-                        DeadType.GetRigidbody, () =>
-                        {
-                            MakeNonStatic(gameObject);
-                            this.gameObject.AddComponent<Rigidbody>();
-                        }
-                    },
-                    { DeadType.DynamicDisappearing, () =>
-                        {
-                            MakeNonStatic(gameObject);
-                            _startShrinking = true;
-                        }
-                    },
-                    { DeadType.Explode, () => ExplodeModule.Execute(Base.ExplodeModules, args) },
-                    {
-                        DeadType.ResetHP, () =>
-                        {
-                            Health = Base.ResetHPTo == 0 ? Base.Health : Base.ResetHPTo;
-                            IsAlive = true;
-                        }
-                    },
-                    { DeadType.PlayAnimation, () => AnimationDTO.Execute(Base.AnimationModules, args) },
-                    { DeadType.Warhead, () => AlphaWarhead(Base.warheadActionType) },
-                    { DeadType.SendMessage, () => MessageModule.Execute(Base.MessageModules, args) },
-                    { DeadType.DropItems, () => DropItem.Execute(Base.dropItems, args) },
-                    { DeadType.SendCommand, () => Commanding.Execute(Base.commandings, args) },
-                    { DeadType.GiveEffect, () => EffectGivingModule.Execute(Base.effectGivingModules, args) },
-                    { DeadType.PlayAudio, () => AudioModule.Execute(Base.AudioModules, args) },
-                    { DeadType.CallGroovieNoise, () => CGNModule.Execute(Base.GroovieNoiseToCall, args) },
-                    { DeadType.CallFunction, () => CFEModule.Execute(Base.FunctionToCall, args) },
+                    Interpolations = Formatter,
+                    InterpolationsList = new object[] { player, transform },
+                    Player = player,
+                    Schematic = OSchematic,
+                    Transform = transform,
+                    TargetCalculated = false,
                 };
-                foreach (DeadType type in Enum.GetValues(typeof(DeadType)))
+                HealthObjectEventHandlers.OnHealthObjectDied(new HealthObjectDiedEventArgs(clone, player));
+
+                MEC.Timing.CallDelayed(Base.DeadActionDelay, () =>
                 {
-                    if (Base.DeadType.HasFlag(type) && deadTypeExecutors.TryGetValue(type, out var execute))
+                    var deadTypeExecutors = new Dictionary<DeadType, Action>
                     {
-                        Log.Debug($"- HO: executing DeadAction: {type}");
-                        execute();
+                        { DeadType.Disappear, () => Destroy(this.gameObject, 0.1f) },
+                        {
+                            DeadType.GetRigidbody, () =>
+                            {
+                                MakeNonStatic(gameObject);
+                                this.gameObject.AddComponent<Rigidbody>();
+                            }
+                        },
+                        { DeadType.DynamicDisappearing, () =>
+                            {
+                                MakeNonStatic(gameObject);
+                                _startShrinking = true;
+                            }
+                        },
+                        { DeadType.Explode, () => ExplodeModule.Execute(Base.ExplodeModules, args) },
+                        {
+                            DeadType.ResetHP, () =>
+                            {
+                                Health = Base.ResetHPTo == 0 ? Base.Health : Base.ResetHPTo;
+                                IsAlive = true;
+                            }
+                        },
+                        { DeadType.PlayAnimation, () => AnimationDTO.Execute(Base.AnimationModules, args) },
+                        { DeadType.Warhead, () => AlphaWarhead(Base.warheadActionType) },
+                        { DeadType.SendMessage, () => MessageModule.Execute(Base.MessageModules, args) },
+                        { DeadType.DropItems, () => DropItem.Execute(Base.dropItems, args) },
+                        { DeadType.SendCommand, () => Commanding.Execute(Base.commandings, args) },
+                        { DeadType.GiveEffect, () => EffectGivingModule.Execute(Base.effectGivingModules, args) },
+                        { DeadType.PlayAudio, () => AudioModule.Execute(Base.AudioModules, args) },
+                        { DeadType.CallGroovieNoise, () => CGNModule.Execute(Base.GroovieNoiseToCall, args) },
+                        { DeadType.CallFunction, () => CFEModule.Execute(Base.FunctionToCall, args) },
+                    };
+                    foreach (DeadType type in Enum.GetValues(typeof(DeadType)))
+                    {
+                        if (Base.DeadType.HasFlag(type) && deadTypeExecutors.TryGetValue(type, out var execute))
+                        {
+                            Log.Debug($"- HO: executing DeadAction: {type}");
+                            execute();
+                        }
                     }
-                }
-            });
+                });
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e);
         }
     }
 

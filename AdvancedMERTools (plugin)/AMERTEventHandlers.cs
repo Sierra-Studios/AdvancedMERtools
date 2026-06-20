@@ -284,14 +284,18 @@ public class AMERTEventHandlers : CustomEventsHandler
                 tclass.Active = dto.Active;
                 tclass.OSchematic = ev.Schematic;
                 AdvancedMERTools.Singleton.CodeClassPair[ev.Schematic].Add(dto.Code, tclass);
-                if (!AdvancedMERTools.Singleton.AMERTGroup[ev.Schematic].ContainsKey(dto.ScriptGroup))
+
+                if (!AdvancedMERTools.Singleton.AMERTGroup.TryGetValue(ev.Schematic, out var sValue) || string.IsNullOrEmpty(dto.ScriptGroup))
                 {
-                    AdvancedMERTools.Singleton.AMERTGroup[ev.Schematic].Add(dto.ScriptGroup, new List<AMERTInteractable> { });
+                    return;
                 }
-                if (dto.ScriptGroup != null && dto.ScriptGroup != "")
+
+                if (!sValue.ContainsKey(dto.ScriptGroup))
                 {
-                    AdvancedMERTools.Singleton.AMERTGroup[ev.Schematic][dto.ScriptGroup].Add(tclass);
+                    sValue.Add(dto.ScriptGroup, new List<AMERTInteractable>());
                 }
+
+                sValue[dto.ScriptGroup].Add(tclass);
             }
         }
     }

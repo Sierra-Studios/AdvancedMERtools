@@ -7,6 +7,9 @@
 		<Configurations>Debug;Release;Installer</Configurations>
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+	  <DebugType>embedded</DebugType>
+	</PropertyGroup>
 
 	<!-- For development: copy output dll directly to LabAPI plugins path -->
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
@@ -28,13 +31,14 @@
 
 	<ItemGroup>
 		<PackageReference Include="Lib.Harmony" Version="$(HarmonyVersion)" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
+		<PackageReference Include="Northwood.LabAPI" Version="1.1.7" />
 		<PackageReference Include="StyleCop.Analyzers" Version="$(StyleCopVersion)" IncludeAssets="All" PrivateAssets="All" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Reference Include="ProjectMER" HintPath="$(LABAPI_PLUGINS)\ProjectMER.dll" Private="false" />
 		<Reference Include="AudioPlayerApi" HintPath="$(LABAPI_DEPENDENCIES)\AudioPlayerApi.dll" Private="false" />
-		<Reference Include="Newtonsoft.Json" HintPath="$(LABAPI_DEPENDENCIES)\Newtonsoft.Json.dll" Private="false" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -42,7 +46,6 @@
 		<Reference Include="Assembly-CSharp" HintPath="$(SL_REFERENCES)\Assembly-CSharp.dll" Private="false" />
 		<Reference Include="Assembly-CSharp-firstpass" HintPath="$(SL_REFERENCES)\Assembly-CSharp-firstpass.dll" Private="false" />
 		<Reference Include="CommandSystem.Core" HintPath="$(SL_REFERENCES)\CommandSystem.Core.dll" Private="false" />
-		<Reference Include="LabApi" HintPath="$(SL_REFERENCES)\LabApi.dll" Private="false" />
 		<Reference Include="Mirror" HintPath="$(SL_REFERENCES)\Mirror.dll" Private="false" />
 		<Reference Include="Pooling" HintPath="$(SL_REFERENCES)\Pooling.dll" Private="false" />
 		<Reference Include="UnityEngine" HintPath="$(SL_REFERENCES)\UnityEngine.dll" Private="false" />

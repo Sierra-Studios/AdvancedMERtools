@@ -11,6 +11,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using UnityEngine;
 using UserSettings.ServerSpecific;
+using Debug = System.Diagnostics.Debug;
 
 namespace AdvancedMERTools;
 
@@ -86,6 +87,30 @@ public class InteractableObject : AMERTInteractable
         Log.Debug($"Adding InteractableObject: {gameObject.name} ({OSchematic.Name})");
 
         Register();
+    }
+
+    private bool Scaled = false;
+    private Vector3? LastScale = null;
+    private void Update()
+    {
+        if (!Base.Active && !Scaled)
+        {
+            LastScale = transform.localScale;
+            transform.localScale = new Vector3(0, 0, 0);
+            Scaled = true;
+            return;
+        }
+
+        if (!Scaled)
+        {
+            return;
+        }
+
+        Scaled = false;
+        if (LastScale.HasValue)
+        {
+            transform.localScale = LastScale.Value;
+        }
     }
 
     protected virtual void Register()
